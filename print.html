@@ -6,8 +6,12 @@
 <title>追溯码打印页</title>
 <script src="qrcodegen.js"></script>
 <style>
-  :root { --lw: 40mm; --lh: 30mm; }
-  @page { margin: 3mm; }
+  :root {
+    --cols: 1;
+    --gap: 0.5mm;
+    --qr-scale: 1;
+  }
+  @page { margin: 2mm; }
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
   html, body { background: #fff; }
   body {
@@ -26,46 +30,105 @@
     top: 0;
     z-index: 10;
   }
-  .print-grid {
+  .toolbar {
+    padding: 8px 12px;
+    background: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
     display: flex;
+    gap: 12px;
+    align-items: center;
+    justify-content: center;
     flex-wrap: wrap;
-    gap: 0;
+    font-size: 12px;
+    color: #475569;
+    position: sticky;
+    top: 36px;
+    z-index: 9;
+  }
+  .toolbar label { display: inline-flex; align-items: center; gap: 4px; }
+  .toolbar select, .toolbar input[type="range"] {
+    padding: 4px 6px;
+    font-size: 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    background: #fff;
+    color: #1e293b;
+  }
+  .toolbar .val { min-width: 28px; text-align: center; color: #1e40af; font-weight: 600; }
+
+  .print-grid {
+    display: grid;
+    grid-template-columns: repeat(var(--cols, 1), 1fr);
+    gap: var(--gap);
     padding: 2mm;
   }
   .print-label {
-    display: inline-flex;
+    display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: space-between;
-    width: var(--lw);
-    height: var(--lh);
     border: 1px dashed #999;
     box-sizing: border-box;
     padding: 0.5mm 1mm;
     text-align: center;
-    margin: 0.25mm;
-    vertical-align: top;
+    overflow: hidden;
     page-break-inside: avoid;
     break-inside: avoid;
-    overflow: hidden;
   }
   .print-label .p-product { font-size: 7pt; font-weight: 600; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .print-label .p-spec { font-size: 6.5pt; color: #333; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .print-label .qr-img { flex: 1 1 auto; display: flex; justify-content: center; align-items: center; min-height: 0; width: 100%; overflow: hidden; }
-  .print-label .qr-img svg { display: block; max-width: 100%; max-height: 100%; }
+  .print-label .qr-img {
+    flex: 1 1 auto;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 0;
+    width: 100%;
+    overflow: hidden;
+  }
+  .print-label .qr-img svg {
+    display: block;
+    max-width: 100%;
+    max-height: 100%;
+    transform: scale(var(--qr-scale, 1));
+    transform-origin: center center;
+  }
   .print-label .p-code { font-size: 7.5pt; font-family: "Courier New", monospace; font-weight: 600; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .print-label .p-batch { font-size: 6pt; color: #555; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .error-box { padding: 30px 16px; text-align: center; color: #dc2626; font-size: 14px; }
   .error-box .icon { font-size: 36px; margin-bottom: 8px; }
   @media print {
-    .info-bar { display: none !important; }
-    .print-grid { padding: 0; }
-    .print-label { margin: 0; }
+    .info-bar, .toolbar { display: none !important; }
+    .print-grid { padding: 0; gap: 0; }
+    .print-label { border: none; margin: 0; }
   }
 </style>
 </head>
 <body>
 <div class="info-bar" id="infoBar">加载中...</div>
+<div class="toolbar" id="toolbar" style="display:none;">
+  <label>每行
+    <select id="colsSel">
+      <option value="1" selected>1 个</option>
+      <option value="2">2 个</option>
+      <option value="3">3 个</option>
+      <option value="4">4 个</option>
+      <option value="5">5 个</option>
+    </select>
+  </label>
+  <label>二维码
+    <input type="range" id="qrScale" min="0.6" max="1.5" step="0.05" value="1">
+    <span class="val" id="qrScaleVal">1.00</span>
+  </label>
+  <label>间距
+    <select id="gapSel">
+      <option value="0mm">无</option>
+      <option value="0.5mm" selected>小</option>
+      <option value="1mm">中</option>
+      <option value="2mm">大</option>
+    </select>
+  </label>
+</div>
 <div class="print-grid" id="printGrid"></div>
 <script>
 (function() {
@@ -128,12 +191,10 @@
     return '<svg xmlns="http://www.w3.org/2000/svg" width="' + sizePx + '" height="' + sizePx + '" viewBox="0 0 ' + sizePx + ' ' + sizePx + '" shape-rendering="crispEdges"><rect width="' + sizePx + '" height="' + sizePx + '" fill="#fff"/>' + rects + '<\/svg>';
   }
 
-  // 生成单个追溯码明文
   function buildCode(prefix, batch, seq) {
     return prefix + "-" + batch + "-" + pad(seq, 4);
   }
 
-  // 生成二维码 URL（与生成器逻辑一致，扫码跳转到查询页）
   function buildQrContent(d, code) {
     const fullData = { c: code, n: d.n, s: d.s, b: d.b, d: d.d, o: d.o };
     const b64 = b64EncodeUtf8(JSON.stringify(fullData));
@@ -144,8 +205,77 @@
 
   function renderError(msg) {
     document.getElementById("infoBar").style.display = "none";
+    document.getElementById("toolbar").style.display = "none";
     document.getElementById("printGrid").innerHTML =
       '<div class="error-box"><div class="icon">!</div><div>' + escapeHtml(msg) + '</div></div>';
+  }
+
+  // 全局缓存解码后的数据，工具栏调整时复用
+  let decodedData = null;
+
+  // 渲染所有标签（每次调整工具栏都会调用）
+  function renderLabels() {
+    const d = decodedData;
+    if (!d) return;
+    const w = d.w || 40, h = d.h || 30;
+    const prefix = d.x || "TR";
+    const start = d.q || 1;
+    const count = Math.max(1, Math.min(d.c || 10, 100));
+
+    const MM_TO_PX = 3.7795;
+    const textHeightMm = 9;
+    const paddingMm = 2;
+    const maxQrByW = (w - paddingMm) * MM_TO_PX;
+    const maxQrByH = (h - textHeightMm - paddingMm) * MM_TO_PX;
+    const qrPx = Math.max(60, Math.min(180, Math.floor(Math.min(maxQrByW, maxQrByH))));
+
+    const grid = document.getElementById("printGrid");
+    grid.innerHTML = "";
+    // 让标签按宽高比自适应；--cols 决定每行几个，aspect-ratio 让高度跟随宽度
+    document.documentElement.style.setProperty("--lw", w + "mm");
+    document.documentElement.style.setProperty("--lh", h + "mm");
+    grid.style.setProperty("aspect-auto", "1");
+
+    const labels = [];
+    for (let i = 0; i < count; i++) {
+      const seq = start + i;
+      const code = buildCode(prefix, d.b, seq);
+      const qrContent = buildQrContent(d, code);
+      let svg = "";
+      try { svg = svgQrString(qrContent, qrPx) || ""; } catch (e) { svg = ""; }
+      labels.push(
+        '<div class="print-label" style="aspect-ratio:' + w + ' / ' + h + ';">' +
+          '<div class="p-product">' + escapeHtml(d.n) + '</div>' +
+          '<div class="p-spec">' + escapeHtml(d.s || "") + '</div>' +
+          '<div class="qr-img">' + svg + '</div>' +
+          '<div class="p-code">' + escapeHtml(code) + '</div>' +
+          '<div class="p-batch">批:' + escapeHtml(d.b) + ' | ' + escapeHtml(d.d || "") + '</div>' +
+        '</div>'
+      );
+    }
+    grid.innerHTML = labels.join("");
+
+    document.getElementById("infoBar").textContent =
+      "共 " + count + " 个追溯码 · " + w + "x" + h + "mm 标签 · 调好排版后在 APP 里点打印按钮";
+  }
+
+  // 工具栏交互
+  function bindToolbar() {
+    const colsSel = document.getElementById("colsSel");
+    const qrScale = document.getElementById("qrScale");
+    const qrScaleVal = document.getElementById("qrScaleVal");
+    const gapSel = document.getElementById("gapSel");
+
+    colsSel.addEventListener("change", () => {
+      document.documentElement.style.setProperty("--cols", colsSel.value);
+    });
+    qrScale.addEventListener("input", () => {
+      document.documentElement.style.setProperty("--qr-scale", qrScale.value);
+      qrScaleVal.textContent = parseFloat(qrScale.value).toFixed(2);
+    });
+    gapSel.addEventListener("change", () => {
+      document.documentElement.style.setProperty("--gap", gapSel.value);
+    });
   }
 
   function init() {
@@ -158,46 +288,10 @@
     catch (e) { renderError("打印数据格式错误"); return; }
     if (!d.n || !d.b) { renderError("打印数据缺少产品名或批次号"); return; }
 
-    const w = d.w || 40, h = d.h || 30;
-    const prefix = d.x || "TR";
-    const start = d.q || 1;
-    const count = Math.max(1, Math.min(d.c || 10, 100));
-
-    // 二维码像素尺寸（与生成器一致，按标签宽高自适应）
-    const MM_TO_PX = 3.7795;
-    const textHeightMm = 9;
-    const paddingMm = 2;
-    const maxQrByW = (w - paddingMm) * MM_TO_PX;
-    const maxQrByH = (h - textHeightMm - paddingMm) * MM_TO_PX;
-    const qrPx = Math.max(30, Math.min(120, Math.floor(Math.min(maxQrByW, maxQrByH))));
-
-    document.documentElement.style.setProperty("--lw", w + "mm");
-    document.documentElement.style.setProperty("--lh", h + "mm");
-
-    const grid = document.getElementById("printGrid");
-    grid.innerHTML = "";
-
-    for (let i = 0; i < count; i++) {
-      const seq = start + i;
-      const code = buildCode(prefix, d.b, seq);
-      const qrContent = buildQrContent(d, code);
-      const lbl = document.createElement("div");
-      lbl.className = "print-label";
-      lbl.style.width = w + "mm";
-      lbl.style.height = h + "mm";
-      let svg = "";
-      try { svg = svgQrString(qrContent, qrPx) || ""; } catch (e) { svg = ""; }
-      lbl.innerHTML =
-        '<div class="p-product">' + escapeHtml(d.n) + '</div>' +
-        '<div class="p-spec">' + escapeHtml(d.s || "") + '</div>' +
-        '<div class="qr-img">' + svg + '</div>' +
-        '<div class="p-code">' + escapeHtml(code) + '</div>' +
-        '<div class="p-batch">批:' + escapeHtml(d.b) + ' | ' + escapeHtml(d.d || "") + '</div>';
-      grid.appendChild(lbl);
-    }
-
-    document.getElementById("infoBar").textContent =
-      "共 " + count + " 个追溯码 · " + w + "x" + h + "mm 标签 · 在叮当小印 APP 里点打印按钮";
+    decodedData = d;
+    document.getElementById("toolbar").style.display = "flex";
+    bindToolbar();
+    renderLabels();
   }
 
   init();

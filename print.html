@@ -231,6 +231,7 @@
     const sp = d.sp !== false, ss = d.ss !== false, sc = d.sc !== false, sb = d.sb !== false;
     const ct = d.ct || "";
     const fS = d.fS || 1;
+    const vS = d.vS || 1;
     // 文字行高度按显示项动态累加（pt → mm：1pt ≈ 0.353mm，加行距 1.5 倍）
     // 每行约 2.5mm；都关掉二维码可占满整个标签高度
     let textHeightMm = 0;
@@ -272,12 +273,14 @@
       }
       // 用显式 width/height mm 替代 aspect-ratio（旧版 Android WebView 不支持 aspect-ratio 会导致高度坍塌）
       let html = '<div class="print-label" style="width:' + w + 'mm;height:' + h + 'mm;max-width:100%;">';
+      // 纵向拉长：transform scaleY(vS) 只拉伸高度，左右不变；line-height 同步放大避免行重叠
+      const vT = 'transform:scaleY(' + vS + ');transform-origin:center;line-height:' + vS + ';';
       html += '<div class="text-col">';
-      if (sp) html += '<div class="p-product" style="font-size:calc(7pt * ' + fS + ')">' + escapeHtml(d.n) + '</div>';
-      if (ss) html += '<div class="p-spec" style="font-size:calc(6.5pt * ' + fS + ')">' + escapeHtml(d.s || "") + '</div>';
-      if (sc) html += '<div class="p-code" style="font-size:calc(7.5pt * ' + fS + ')">' + escapeHtml(code) + '</div>';
-      if (sb) html += '<div class="p-batch" style="font-size:calc(6pt * ' + fS + ')">批:' + escapeHtml(d.b) + ' | ' + escapeHtml(d.d || "") + '</div>';
-      if (ct) html += '<div class="p-custom" style="font-size:calc(6pt * ' + fS + ');color:#555;width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(ct) + '</div>';
+      if (sp) html += '<div class="p-product" style="font-size:calc(7pt * ' + fS + ');' + vT + '">' + escapeHtml(d.n) + '</div>';
+      if (ss) html += '<div class="p-spec" style="font-size:calc(6.5pt * ' + fS + ');' + vT + '">' + escapeHtml(d.s || "") + '</div>';
+      if (sc) html += '<div class="p-code" style="font-size:calc(7.5pt * ' + fS + ');' + vT + '">' + escapeHtml(code) + '</div>';
+      if (sb) html += '<div class="p-batch" style="font-size:calc(6pt * ' + fS + ');' + vT + '">批:' + escapeHtml(d.b) + ' | ' + escapeHtml(d.d || "") + '</div>';
+      if (ct) html += '<div class="p-custom" style="font-size:calc(6pt * ' + fS + ');' + vT + 'color:#555;width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(ct) + '</div>';
       html += '</div>';
       html += '<div class="qr-img" style="width:' + qrMm + 'mm;height:' + qrMm + 'mm;max-width:50%;">' + svg + '</div>';
       html += '</div>';

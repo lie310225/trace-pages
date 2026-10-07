@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>追溯码打印编辑器</title>
+<script src="qrcodegen.js"></script>
+<style>
+  :root {
+    --primary: #2563eb;
+    --primary-dark: #1e40af;
+    --bg: #f7f8fc;
+    --card: #ffffff;
+    --border: #e2e8f0;
+    --text: #1e293b;
+    --muted: #64748b;
+    --success: #16a34a;
+    --shadow: 0 2px 12px rgba(0,0,0,.06);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+    padding: 14px;
+  }
+  header {
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    color: #fff;
+    padding: 14px 18px;
+    border-radius: 10px;
+    margin-bottom: 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  header h1 { font-size: 18px; font-weight: 600; }
+  header p { font-size: 12px; opacity: .9; margin-top: 2px; }
+  header .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 9px 14px;
+    font-size: 13px;
+    font-weight: 500;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .btn-primary { background: #fff; color: var(--primary-dark); }
+  .btn-success { background: var(--success); color: #fff; }
+  .btn-ghost { background: rgba(255,255,255,.15); color: #fff; border: 1px solid rgba(255,255,255,.3); }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  @media (min-width: 1100px) {
+    .layout { grid-template-columns: 380px 1fr; }
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    box-shadow: var(--shadow);
+    margin-bottom: 12px;
+  }
+  .card h2 {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--primary-dark);
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .field { margin-bottom: 10px; }
+  .field label {
+    display: block;
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+  .field input,
+  .field select,
+  .field textarea {
+    width: 100%;
+    padding: 7px 9px;
+    font-size: 13px;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    font-family: inherit;
+  }
+  .field input:focus,
+  .field select:focus { outline: none; border-color: var(--primary); }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+  .toggle-row { display: flex; align-items: center; gap: 6px; font-size: 12px; padding: 4px 0; }
+  .toggle-row input[type="checkbox"] { margin: 0; }
+
+  .preview-card { min-height: 400px; }
+  .preview-toolbar {
+    background: #f1f5f9;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .preview-toolbar strong { color: var(--primary-dark); }
+  .preview-area {
+    background: #f8fafc;
+    border-radius: 6px;
+    padding: 12px;
+    min-height: 300px;
+    overflow: auto;
+  }
+  .print-grid {
+    display: grid;
+    gap: 0.5mm;
+    padding: 2mm;
+  }
+  .print-label {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    border: 1px dashed #999;
+    box-sizing: border-box;
+    padding: 0.5mm 1mm;
+    text-align: center;
+    overflow: hidden;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  .print-label .p-product { font-size: 7pt; font-weight: 600; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .print-label .p-spec { font-size: 6.5pt; color: #333; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .print-label .qr-img { flex: 1 1 auto; display: flex; justify-content: center; align-items: center; min-height: 0; width: 100%; overflow: hidden; }
+  .print-label .qr-img svg { display: block; max-width: 100%; max-height: 100%; }
+  .print-label .p-code { font-size: 7.5pt; font-family: "Courier New", monospace; font-weight: 600; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .print-label .p-batch { font-size: 6pt; color: #555; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .print-label .p-custom { font-size: 6pt; color: #555; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .url-card {
+    position: sticky;
+    bottom: 14px;
+    z-index: 10;
+  }
+  .url-output {
+    width: 100%;
+    padding: 8px;
+    font-size: 11px;
+    font-family: "Courier New", monospace;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    background: #f1f5f9;
+    color: var(--text);
+    margin-bottom: 8px;
+    word-break: break-all;
+  }
+  .url-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .url-actions .btn { flex: 1; min-width: 100px; }
+  .url-actions .btn-ghost { background: #fff; color: var(--text); border: 1px solid var(--border); }
+  .copy-ok { color: var(--success); font-size: 12px; text-align: center; display: none; }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>追溯码打印编辑器</h1>
+    <p>在电脑上调整 APP 网页打印的格式与内容，调好后生成网址给叮当小印 APP 用</p>
+  </div>
+  <div class="actions">
+    <button class="btn btn-ghost" id="loadFromUrlBtn">从网址载入</button>
+    <button class="btn btn-primary" id="genUrlBtn">生成网址</button>
+  </div>
+</header>
+
+<div class="layout">
+  <!-- 左侧编辑表单 -->
+  <div>
+    <div class="card">
+      <h2>① 字段内容</h2>
+      <div class="field">
+        <label>产品名称 *</label>
+        <input type="text" id="f_n" value="测试产品">
+      </div>
+      <div class="row">
+        <div class="field">
+          <label>规格</label>
+          <input type="text" id="f_s" value="250g">
+        </div>
+        <div class="field">
+          <label>生产企业</label>
+          <input type="text" id="f_o" value="示例企业">
+        </div>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label>批次号 *</label>
+          <input type="text" id="f_b" value="B20261007">
+        </div>
+        <div class="field">
+          <label>生产日期 *</label>
+          <input type="date" id="f_d" value="2026-10-07">
+        </div>
+      </div>
+      <div class="row-3">
+        <div class="field">
+          <label>追溯码前缀</label>
+          <input type="text" id="f_x" value="TR" maxlength="6">
+        </div>
+        <div class="field">
+          <label>起始号</label>
+          <input type="number" id="f_q" value="1" min="1" max="9999">
+        </div>
+        <div class="field">
+          <label>数量 *</label>
+          <input type="number" id="f_c" value="10" min="1" max="100">
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>② 标签规格 / 排版</h2>
+      <div class="row">
+        <div class="field">
+          <label>标签宽 (mm)</label>
+          <input type="number" id="f_w" value="40" min="10" max="100">
+        </div>
+        <div class="field">
+          <label>标签高 (mm)</label>
+          <input type="number" id="f_h" value="30" min="10" max="100">
+        </div>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label>每行标签数</label>
+          <select id="f_cols">
+            <option value="1" selected>1 个</option>
+            <option value="2">2 个</option>
+            <option value="3">3 个</option>
+            <option value="4">4 个</option>
+            <option value="5">5 个</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>标签间距</label>
+          <select id="f_gap">
+            <option value="0mm">无</option>
+            <option value="0.5mm" selected>小 (0.5mm)</option>
+            <option value="1mm">中 (1mm)</option>
+            <option value="2mm">大 (2mm)</option>
+          </select>
+        </div>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label>二维码缩放 <span id="f_qrS_val" style="color:var(--primary)">1.00</span></label>
+          <input type="range" id="f_qrS" min="0.6" max="1.5" step="0.05" value="1">
+        </div>
+        <div class="field">
+          <label>字体缩放 <span id="f_fS_val" style="color:var(--primary)">1.00</span></label>
+          <input type="range" id="f_fS" min="0.7" max="1.5" step="0.05" value="1">
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>③ 标签内显示项</h2>
+      <div class="toggle-row"><input type="checkbox" id="f_sp" checked><label for="f_sp" style="margin:0;">显示产品名</label></div>
+      <div class="toggle-row"><input type="checkbox" id="f_ss" checked><label for="f_ss" style="margin:0;">显示规格</label></div>
+      <div class="toggle-row"><input type="checkbox" id="f_sc" checked><label for="f_sc" style="margin:0;">显示追溯码</label></div>
+      <div class="toggle-row"><input type="checkbox" id="f_sb" checked><label for="f_sb" style="margin:0;">显示批次+日期</label></div>
+      <div class="field" style="margin-top:8px;">
+        <label>自定义固定文本（可选，显示在批次下方）</label>
+        <input type="text" id="f_ct" placeholder="例：本品质保 12 个月">
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>④ 查询页网址（二维码指向）</h2>
+      <div class="field">
+        <label>URL（扫码后跳转的查询页）</label>
+        <input type="text" id="f_u" value="https://lie310225.github.io/trace-pages/">
+      </div>
+    </div>
+  </div>
+
+  <!-- 右侧预览 + 网址输出 -->
+  <div>
+    <div class="card preview-card">
+      <div class="preview-toolbar">
+        <span>实时预览 · 共 <strong id="previewCount">0</strong> 个标签</span>
+        <span style="font-size:11px;">实际打印效果以叮当小印 APP 内为准</span>
+      </div>
+      <div class="preview-area">
+        <div class="print-grid" id="previewGrid"></div>
+      </div>
+    </div>
+
+    <div class="card url-card">
+      <h2>⑤ 生成网址</h2>
+      <input type="text" class="url-output" id="urlOutput" readonly placeholder="点上方「生成网址」按钮">
+      <div class="url-actions">
+        <button class="btn btn-success" id="copyUrlBtn">复制网址</button>
+        <button class="btn btn-ghost" id="openInNewBtn">在新窗口打开</button>
+        <button class="btn btn-ghost" id="genQrBtn">生成二维码</button>
+      </div>
+      <div class="copy-ok" id="copyOk">已复制到剪贴板</div>
+      <div id="qrPreview" style="margin-top:10px;text-align:center;"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  "use strict";
+
+  const PRINT_URL_BASE = "https://lie310225.github.io/trace-pages/print.html";
+
+  function $(id) { return document.getElementById(id); }
+
+  function pad(num, len) {
+    let s = String(num);
+    while (s.length < len) s = "0" + s;
+    return s;
+  }
+  function escapeHtml(s) {
+    if (s == null) return "";
+    return String(s).replace(/[&<>"']/g, function(c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function b64EncodeUtf8(str) {
+    const bytes = new TextEncoder().encode(str);
+    let binary = "";
+    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+    return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+  function b64DecodeUtf8(str) {
+    try {
+      str = str.replace(/-/g, "+").replace(/_/g, "/");
+      const binary = atob(str);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      return new TextDecoder("utf-8").decode(bytes);
+    } catch (e) { return null; }
+  }
+
+  function svgQrString(text, sizePx) {
+    if (typeof qrcode === "undefined") return null;
+    const qr = qrcode(0, "M");
+    qr.addData(text);
+    qr.make();
+    const n = qr.getModuleCount();
+    const cell = sizePx / n;
+    let rects = "";
+    for (let r = 0; r < n; r++) {
+      for (let c = 0; c < n; c++) {
+        if (qr.isDark(r, c)) {
+          rects += '<rect x="' + (c * cell).toFixed(3) + '" y="' + (r * cell).toFixed(3) + '" width="' + cell.toFixed(3) + '" height="' + cell.toFixed(3) + '" fill="#000"/>';
+        }
+      }
+    }
+    return '<svg xmlns="http://www.w3.org/2000/svg" width="' + sizePx + '" height="' + sizePx + '" viewBox="0 0 ' + sizePx + ' ' + sizePx + '" shape-rendering="crispEdges"><rect width="' + sizePx + '" height="' + sizePx + '" fill="#fff"/>' + rects + '<\/svg>';
+  }
+
+  function buildCode(prefix, batch, seq) {
+    return prefix + "-" + batch + "-" + pad(seq, 4);
+  }
+  function buildQrContent(d, code) {
+    const fullData = { c: code, n: d.n, s: d.s, b: d.b, d: d.d, o: d.o };
+    const b64 = b64EncodeUtf8(JSON.stringify(fullData));
+    const prefix = d.u || "https://lie310225.github.io/trace-pages/";
+    const sep = /[?&]$/.test(prefix) ? "" : (prefix.indexOf("?") >= 0 ? "&" : "?");
+    return prefix + sep + "d=" + b64;
+  }
+
+  // 从表单读所有字段（与 print.html 解码端字段名约定一致）
+  function readForm() {
+    return {
+      n: $("f_n").value.trim(),
+      s: $("f_s").value.trim(),
+      o: $("f_o").value.trim(),
+      b: $("f_b").value.trim(),
+      d: $("f_d").value,
+      x: $("f_x").value.trim() || "TR",
+      q: parseInt($("f_q").value, 10) || 1,
+      c: Math.max(1, Math.min(parseInt($("f_c").value, 10) || 1, 100)),
+      w: Math.max(10, Math.min(parseInt($("f_w").value, 10) || 40, 100)),
+      h: Math.max(10, Math.min(parseInt($("f_h").value, 10) || 30, 100)),
+      u: $("f_u").value.trim(),
+      cols: parseInt($("f_cols").value, 10) || 1,
+      qrS: parseFloat($("f_qrS").value) || 1,
+      gap: $("f_gap").value,
+      fS: parseFloat($("f_fS").value) || 1,
+      sp: $("f_sp").checked,
+      ss: $("f_ss").checked,
+      sc: $("f_sc").checked,
+      sb: $("f_sb").checked,
+      ct: $("f_ct").value
+    };
+  }
+
+  // 把表单数据写回表单（用于从 URL 加载）
+  function writeForm(d) {
+    $("f_n").value = d.n || "";
+    $("f_s").value = d.s || "";
+    $("f_o").value = d.o || "";
+    $("f_b").value = d.b || "";
+    $("f_d").value = d.d || "";
+    $("f_x").value = d.x || "TR";
+    $("f_q").value = d.q || 1;
+    $("f_c").value = d.c || 10;
+    $("f_w").value = d.w || 40;
+    $("f_h").value = d.h || 30;
+    $("f_u").value = d.u || "https://lie310225.github.io/trace-pages/";
+    $("f_cols").value = String(d.cols || 1);
+    $("f_qrS").value = d.qrS || 1;
+    $("f_qrS_val").textContent = parseFloat(d.qrS || 1).toFixed(2);
+    $("f_gap").value = d.gap || "0.5mm";
+    $("f_fS").value = d.fS || 1;
+    $("f_fS_val").textContent = parseFloat(d.fS || 1).toFixed(2);
+    $("f_sp").checked = d.sp !== false;
+    $("f_ss").checked = d.ss !== false;
+    $("f_sc").checked = d.sc !== false;
+    $("f_sb").checked = d.sb !== false;
+    $("f_ct").value = d.ct || "";
+  }
+
+  // 生成 URL（把表单数据编码到 print.html?p=...）
+  function buildUrl() {
+    const d = readForm();
+    const b64 = b64EncodeUtf8(JSON.stringify(d));
+    return PRINT_URL_BASE + "?p=" + b64;
+  }
+
+  // 实时预览（与 print.html 渲染逻辑一致）
+  function renderPreview() {
+    const d = readForm();
+    const w = d.w, h = d.h;
+    const qrPx = Math.max(60, Math.min(180, Math.floor(Math.min((w - 2) * 3.7795, (h - 9 - 2) * 3.7795))));
+
+    const grid = $("previewGrid");
+    grid.style.gridTemplateColumns = "repeat(" + d.cols + ", 1fr)";
+    grid.style.gap = d.gap;
+    grid.innerHTML = "";
+
+    // 字体缩放通过 CSS 变量
+    grid.style.setProperty("--f-scale", d.fS);
+
+    const labels = [];
+    for (let i = 0; i < d.c; i++) {
+      const seq = d.q + i;
+      const code = buildCode(d.x, d.b, seq);
+      const qrContent = buildQrContent(d, code);
+      let svg = "";
+      try { svg = svgQrString(qrContent, qrPx) || ""; } catch (e) { svg = ""; }
+      let html = '<div class="print-label" style="aspect-ratio:' + w + ' / ' + h + ';font-size:calc(7pt * ' + d.fS + ');">';
+      if (d.sp) html += '<div class="p-product" style="font-size:calc(7pt * ' + d.fS + ')">' + escapeHtml(d.n) + '</div>';
+      if (d.ss) html += '<div class="p-spec" style="font-size:calc(6.5pt * ' + d.fS + ')">' + escapeHtml(d.s) + '</div>';
+      html += '<div class="qr-img">' + svg + '</div>';
+      if (d.sc) html += '<div class="p-code" style="font-size:calc(7.5pt * ' + d.fS + ')">' + escapeHtml(code) + '</div>';
+      if (d.sb) html += '<div class="p-batch" style="font-size:calc(6pt * ' + d.fS + ')">批:' + escapeHtml(d.b) + ' | ' + escapeHtml(d.d) + '</div>';
+      if (d.ct) html += '<div class="p-custom" style="font-size:calc(6pt * ' + d.fS + ')">' + escapeHtml(d.ct) + '</div>';
+      html += '</div>';
+      labels.push(html);
+    }
+    grid.innerHTML = labels.join("");
+    $("previewCount").textContent = String(d.c);
+  }
+
+  // 复制到剪贴板
+  function copyText(text, onOk) {
+    const showOk = () => { $("copyOk").style.display = "block"; setTimeout(() => { $("copyOk").style.display = "none"; }, 2000); if (onOk) onOk(); };
+    if (navigator.clipboard && navigator.clipboard.writeText && location.protocol.startsWith("http")) {
+      navigator.clipboard.writeText(text).then(showOk).catch(() => fallbackCopy(text, showOk));
+    } else {
+      fallbackCopy(text, showOk);
+    }
+  }
+  function fallbackCopy(text, onOk) {
+    try {
+      const ta = $("urlOutput");
+      ta.select();
+      document.execCommand("copy");
+      if (onOk) onOk();
+    } catch (e) { alert("复制失败，请手动选中复制"); }
+  }
+
+  // 事件绑定
+  function bindEvents() {
+    // 所有表单字段变化都触发预览
+    ["f_n", "f_s", "f_o", "f_b", "f_d", "f_x", "f_q", "f_c", "f_w", "f_h", "f_u",
+     "f_cols", "f_gap", "f_sp", "f_ss", "f_sc", "f_sb", "f_ct"].forEach(id => {
+      const el = $(id);
+      el.addEventListener("input", renderPreview);
+      el.addEventListener("change", renderPreview);
+    });
+    $("f_qrS").addEventListener("input", () => { $("f_qrS_val").textContent = parseFloat($("f_qrS").value).toFixed(2); renderPreview(); });
+    $("f_fS").addEventListener("input", () => { $("f_fS_val").textContent = parseFloat($("f_fS").value).toFixed(2); renderPreview(); });
+
+    $("genUrlBtn").addEventListener("click", () => {
+      const url = buildUrl();
+      $("urlOutput").value = url;
+      $("qrPreview").innerHTML = "";
+      copyText(url);
+    });
+    $("copyUrlBtn").addEventListener("click", () => {
+      let url = $("urlOutput").value;
+      if (!url) { url = buildUrl(); $("urlOutput").value = url; }
+      copyText(url);
+    });
+    $("openInNewBtn").addEventListener("click", () => {
+      const url = $("urlOutput").value || buildUrl();
+      window.open(url, "_blank");
+    });
+    $("genQrBtn").addEventListener("click", () => {
+      let url = $("urlOutput").value;
+      if (!url) { url = buildUrl(); $("urlOutput").value = url; }
+      const svg = svgQrString(url, 200);
+      $("qrPreview").innerHTML = svg ? svg : '<div style="color:#dc2626;font-size:12px;">二维码生成失败</div>';
+    });
+    $("loadFromUrlBtn").addEventListener("click", () => {
+      const input = prompt("粘贴 print.html 网址（含 ?p= 参数）：", "");
+      if (!input) return;
+      const m = /[?&]p=([^&#]+)/.exec(input);
+      if (!m) { alert("网址里没找到 p 参数"); return; }
+      const json = b64DecodeUtf8(m[1]);
+      if (!json) { alert("数据解码失败"); return; }
+      try { writeForm(JSON.parse(json)); renderPreview(); }
+      catch (e) { alert("数据格式错误：" + e.message); }
+    });
+  }
+
+  // 初始化：如果 URL 里有 p 参数，自动加载
+  function init() {
+    const m = new RegExp("[?&]p=([^&#]*)").exec(location.search);
+    if (m) {
+      const json = b64DecodeUtf8(decodeURIComponent(m[1]));
+      if (json) {
+        try { writeForm(JSON.parse(json)); } catch (e) { /* 忽略，用默认 */ }
+      }
+    }
+    bindEvents();
+    renderPreview();
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>

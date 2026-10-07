@@ -269,8 +269,8 @@
       </div>
       <div class="row">
         <div class="field">
-          <label>二维码缩放 <span id="f_qrS_val" style="color:var(--primary)">1.00</span></label>
-          <input type="range" id="f_qrS" min="0.6" max="1.5" step="0.05" value="1">
+          <label>二维码大小 mm <span style="color:var(--muted);font-size:11px;">(留空=自动)</span></label>
+          <input type="number" id="f_qrMm" min="0" max="100" step="0.5" placeholder="自动">
         </div>
         <div class="field">
           <label>字体缩放 <span id="f_fS_val" style="color:var(--primary)">1.00</span></label>
@@ -405,7 +405,7 @@
       h: Math.max(10, Math.min(parseInt($("f_h").value, 10) || 30, 100)),
       u: $("f_u").value.trim(),
       cols: parseInt($("f_cols").value, 10) || 1,
-      qrS: parseFloat($("f_qrS").value) || 1,
+      qrMm: parseFloat($("f_qrMm").value) || 0,
       gap: $("f_gap").value,
       fS: parseFloat($("f_fS").value) || 1,
       sp: $("f_sp").checked,
@@ -430,8 +430,7 @@
     $("f_h").value = d.h || 30;
     $("f_u").value = d.u || "https://lie310225.github.io/trace-pages/";
     $("f_cols").value = String(d.cols || 1);
-    $("f_qrS").value = d.qrS || 1;
-    $("f_qrS_val").textContent = parseFloat(d.qrS || 1).toFixed(2);
+    $("f_qrMm").value = d.qrMm || "";
     $("f_gap").value = d.gap || "0.5mm";
     $("f_fS").value = d.fS || 1;
     $("f_fS_val").textContent = parseFloat(d.fS || 1).toFixed(2);
@@ -460,8 +459,13 @@
     if (d.sc) textHeightMm += 2.8 * d.fS;
     if (d.sb) textHeightMm += 2.2 * d.fS;
     if (d.ct) textHeightMm += 2.2 * d.fS;
-    // qrPx 上限 400，让 SVG 模块数足够多，缩放后仍清晰
-    const qrPx = Math.max(60, Math.min(400, Math.floor(Math.min((w - 2) * 3.7795, (h - textHeightMm - 2) * 3.7795))));
+    // qrPx：用户指定 mm 时直接换算；否则按显示项动态计算
+    let qrPx;
+    if (d.qrMm > 0) {
+      qrPx = Math.max(60, Math.min(400, Math.floor(d.qrMm * 3.7795)));
+    } else {
+      qrPx = Math.max(60, Math.min(400, Math.floor(Math.min((w - 2) * 3.7795, (h - textHeightMm - 2) * 3.7795))));
+    }
 
     const grid = $("previewGrid");
     grid.style.gridTemplateColumns = "repeat(" + d.cols + ", 1fr)";
@@ -478,6 +482,10 @@
       const qrContent = buildQrContent(d, code);
       let svg = "";
       try { svg = svgQrString(qrContent, qrPx) || ""; } catch (e) { svg = ""; }
+      // 用户指定二维码 mm 时，覆盖 SVG 默认撑满为固定 mm（inline style 优先级高于 CSS）
+      if (d.qrMm > 0 && svg) {
+        svg = svg.replace('<svg ', '<svg style="width:' + d.qrMm + 'mm;height:' + d.qrMm + 'mm" ');
+      }
       let html = '<div class="print-label" style="aspect-ratio:' + w + ' / ' + h + ';font-size:calc(7pt * ' + d.fS + ');">';
       if (d.sp) html += '<div class="p-product" style="font-size:calc(7pt * ' + d.fS + ')">' + escapeHtml(d.n) + '</div>';
       if (d.ss) html += '<div class="p-spec" style="font-size:calc(6.5pt * ' + d.fS + ')">' + escapeHtml(d.s) + '</div>';
@@ -514,12 +522,11 @@
   function bindEvents() {
     // 所有表单字段变化都触发预览
     ["f_n", "f_s", "f_o", "f_b", "f_d", "f_x", "f_q", "f_c", "f_w", "f_h", "f_u",
-     "f_cols", "f_gap", "f_sp", "f_ss", "f_sc", "f_sb", "f_ct"].forEach(id => {
+     "f_cols", "f_qrMm", "f_gap", "f_sp", "f_ss", "f_sc", "f_sb", "f_ct"].forEach(id => {
       const el = $(id);
       el.addEventListener("input", renderPreview);
       el.addEventListener("change", renderPreview);
     });
-    $("f_qrS").addEventListener("input", () => { $("f_qrS_val").textContent = parseFloat($("f_qrS").value).toFixed(2); renderPreview(); });
     $("f_fS").addEventListener("input", () => { $("f_fS_val").textContent = parseFloat($("f_fS").value).toFixed(2); renderPreview(); });
 
     $("genUrlBtn").addEventListener("click", () => {

@@ -278,7 +278,7 @@
           </select>
         </div>
       </div>
-      <div class="row">
+      <div class="row-3">
         <div class="field">
           <label>二维码大小 mm <span style="color:var(--muted);font-size:11px;">(留空=自动)</span></label>
           <input type="number" id="f_qrMm" min="0" max="100" step="0.5" placeholder="自动">
@@ -286,6 +286,10 @@
         <div class="field">
           <label>字体缩放 <span id="f_fS_val" style="color:var(--primary)">1.00</span></label>
           <input type="range" id="f_fS" min="0.7" max="1.5" step="0.05" value="1">
+        </div>
+        <div class="field">
+          <label>纵向拉长 <span id="f_vS_val" style="color:var(--primary)">2.00</span></label>
+          <input type="range" id="f_vS" min="1" max="3" step="0.1" value="2">
         </div>
       </div>
     </div>
@@ -419,6 +423,7 @@
       qrMm: parseFloat($("f_qrMm").value) || 0,
       gap: $("f_gap").value,
       fS: parseFloat($("f_fS").value) || 1,
+      vS: parseFloat($("f_vS").value) || 1,
       sp: $("f_sp").checked,
       ss: $("f_ss").checked,
       sc: $("f_sc").checked,
@@ -445,6 +450,8 @@
     $("f_gap").value = d.gap || "0.5mm";
     $("f_fS").value = d.fS || 1;
     $("f_fS_val").textContent = parseFloat(d.fS || 1).toFixed(2);
+    $("f_vS").value = d.vS || 1;
+    $("f_vS_val").textContent = parseFloat(d.vS || 1).toFixed(2);
     $("f_sp").checked = d.sp !== false;
     $("f_ss").checked = d.ss !== false;
     $("f_sc").checked = d.sc !== false;
@@ -500,12 +507,14 @@
         svg = svg.replace('<svg ', '<svg style="width:100%;height:100%;display:block;" ');
       }
       let html = '<div class="print-label" style="width:' + w + 'mm;height:' + h + 'mm;max-width:100%;font-size:calc(7pt * ' + d.fS + ');">';
+      // 纵向拉长：transform scaleY(vS) 只拉伸高度，左右不变；line-height 同步放大避免行重叠
+      const vT = 'transform:scaleY(' + d.vS + ');transform-origin:center;line-height:' + d.vS + ';';
       html += '<div class="text-col">';
-      if (d.sp) html += '<div class="p-product" style="font-size:calc(7pt * ' + d.fS + ')">' + escapeHtml(d.n) + '</div>';
-      if (d.ss) html += '<div class="p-spec" style="font-size:calc(6.5pt * ' + d.fS + ')">' + escapeHtml(d.s) + '</div>';
-      if (d.sc) html += '<div class="p-code" style="font-size:calc(7.5pt * ' + d.fS + ')">' + escapeHtml(code) + '</div>';
-      if (d.sb) html += '<div class="p-batch" style="font-size:calc(6pt * ' + d.fS + ')">批:' + escapeHtml(d.b) + ' | ' + escapeHtml(d.d) + '</div>';
-      if (d.ct) html += '<div class="p-custom" style="font-size:calc(6pt * ' + d.fS + ')">' + escapeHtml(d.ct) + '</div>';
+      if (d.sp) html += '<div class="p-product" style="font-size:calc(7pt * ' + d.fS + ');' + vT + '">' + escapeHtml(d.n) + '</div>';
+      if (d.ss) html += '<div class="p-spec" style="font-size:calc(6.5pt * ' + d.fS + ');' + vT + '">' + escapeHtml(d.s) + '</div>';
+      if (d.sc) html += '<div class="p-code" style="font-size:calc(7.5pt * ' + d.fS + ');' + vT + '">' + escapeHtml(code) + '</div>';
+      if (d.sb) html += '<div class="p-batch" style="font-size:calc(6pt * ' + d.fS + ');' + vT + '">批:' + escapeHtml(d.b) + ' | ' + escapeHtml(d.d) + '</div>';
+      if (d.ct) html += '<div class="p-custom" style="font-size:calc(6pt * ' + d.fS + ');' + vT + '">' + escapeHtml(d.ct) + '</div>';
       html += '</div>';
       html += '<div class="qr-img" style="width:' + qrMm + 'mm;height:' + qrMm + 'mm;max-width:50%;">' + svg + '</div>';
       html += '</div>';
@@ -543,6 +552,7 @@
       el.addEventListener("change", renderPreview);
     });
     $("f_fS").addEventListener("input", () => { $("f_fS_val").textContent = parseFloat($("f_fS").value).toFixed(2); renderPreview(); });
+    $("f_vS").addEventListener("input", () => { $("f_vS_val").textContent = parseFloat($("f_vS").value).toFixed(2); renderPreview(); });
 
     $("genUrlBtn").addEventListener("click", () => {
       const url = buildUrl();

@@ -238,8 +238,13 @@
     const paddingMm = 2;
     const maxQrByW = (w - paddingMm) * MM_TO_PX;
     const maxQrByH = (h - textHeightMm - paddingMm) * MM_TO_PX;
-    // qrPx 上限提到 400，让 SVG 渲染时模块数足够多，缩放后仍清晰
-    const qrPx = Math.max(60, Math.min(400, Math.floor(Math.min(maxQrByW, maxQrByH))));
+    // qrPx：用户指定 mm 时直接换算；否则按显示项动态计算
+    let qrPx;
+    if (d.qrMm > 0) {
+      qrPx = Math.max(60, Math.min(400, Math.floor(d.qrMm * 3.7795)));
+    } else {
+      qrPx = Math.max(60, Math.min(400, Math.floor(Math.min(maxQrByW, maxQrByH))));
+    }
 
     const grid = document.getElementById("printGrid");
     grid.innerHTML = "";
@@ -255,6 +260,10 @@
       const qrContent = buildQrContent(d, code);
       let svg = "";
       try { svg = svgQrString(qrContent, qrPx) || ""; } catch (e) { svg = ""; }
+      // 用户指定二维码 mm 时，覆盖 SVG 默认撑满为固定 mm
+      if (d.qrMm > 0 && svg) {
+        svg = svg.replace('<svg ', '<svg style="width:' + d.qrMm + 'mm;height:' + d.qrMm + 'mm" ');
+      }
       let html = '<div class="print-label" style="aspect-ratio:' + w + ' / ' + h + ';">';
       if (sp) html += '<div class="p-product" style="font-size:calc(7pt * ' + fS + ')">' + escapeHtml(d.n) + '</div>';
       if (ss) html += '<div class="p-spec" style="font-size:calc(6.5pt * ' + fS + ')">' + escapeHtml(d.s || "") + '</div>';

@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>追溯码打印页</title>
+<script src="qrcodegen.js"></script>
+<style>
+  :root { --lw: 40mm; --lh: 30mm; }
+  @page { margin: 3mm; }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { background: #fff; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+    color: #1e293b;
+    line-height: 1.1;
+  }
+  .info-bar {
+    padding: 8px 12px;
+    background: #eff6ff;
+    border-bottom: 1px solid #bfdbfe;
+    font-size: 12px;
+    color: #1e40af;
+    text-align: center;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  .print-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    padding: 2mm;
+  }
+  .print-label {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    width: var(--lw);
+    height: var(--lh);
+    border: 1px dashed #999;
+    box-sizing: border-box;
+    padding: 0.5mm 1mm;
+    text-align: center;
+    margin: 0.25mm;
+    vertical-align: top;
+    page-break-inside: avoid;
+    break-inside: avoid;
+    overflow: hidden;
+  }
+  .print-label .p-product { font-size: 7pt; font-weight: 600; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .print-label .p-spec { font-size: 6.5pt; color: #333; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .print-label .qr-img { flex: 1 1 auto; display: flex; justify-content: center; align-items: center; min-height: 0; width: 100%; overflow: hidden; }
+  .print-label .qr-img svg { display: block; max-width: 100%; max-height: 100%; }
+  .print-label .p-code { font-size: 7.5pt; font-family: "Courier New", monospace; font-weight: 600; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .print-label .p-batch { font-size: 6pt; color: #555; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .error-box { padding: 30px 16px; text-align: center; color: #dc2626; font-size: 14px; }
+  .error-box .icon { font-size: 36px; margin-bottom: 8px; }
+  @media print {
+    .info-bar { display: none !important; }
+    .print-grid { padding: 0; }
+    .print-label { margin: 0; }
+  }
+</style>
+</head>
+<body>
+<div class="info-bar" id="infoBar">加载中...</div>
+<div class="print-grid" id="printGrid"></div>
+<script>
+(function() {
+  "use strict";
+
+  // 解析 URL 参数
+  function getQuery(name) {
+    const m = new RegExp("[?&]" + name + "=([^&#]*)").exec(location.search);
+    return m ? decodeURIComponent(m[1]) : "";
+  }
+
+  // UTF-8 安全的 base64 解码（URL-safe 变体）
+  function b64DecodeUtf8(str) {
+    try {
+      str = str.replace(/-/g, "+").replace(/_/g, "/");
+      const binary = atob(str);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      return new TextDecoder("utf-8").decode(bytes);
+    } catch (e) { return null; }
+  }
+
+  // UTF-8 安全的 base64 编码（URL-safe 变体）
+  function b64EncodeUtf8(str) {
+    const bytes = new TextEncoder().encode(str);
+    let binary = "";
+    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+    return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+
+  function pad(num, len) {
+    let s = String(num);
+    while (s.length < len) s = "0" + s;
+    return s;
+  }
+
+  function escapeHtml(s) {
+    if (s == null) return "";
+    return String(s).replace(/[&<>"']/g, function(c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+
+  // 生成二维码 SVG 字符串
+  function svgQrString(text, sizePx) {
+    if (typeof qrcode === "undefined") return null;
+    const qr = qrcode(0, "M");
+    qr.addData(text);
+    qr.make();
+    const n = qr.getModuleCount();
+    const cell = sizePx / n;
+    let rects = "";
+    for (let r = 0; r < n; r++) {
+      for (let c = 0; c < n; c++) {
+        if (qr.isDark(r, c)) {
+          rects += '<rect x="' + (c * cell).toFixed(3) + '" y="' + (r * cell).toFixed(3) + '" width="' + cell.toFixed(3) + '" height="' + cell.toFixed(3) + '" fill="#000"/>';
+        }
+      }
+    }
+    return '<svg xmlns="http://www.w3.org/2000/svg" width="' + sizePx + '" height="' + sizePx + '" viewBox="0 0 ' + sizePx + ' ' + sizePx + '" shape-rendering="crispEdges"><rect width="' + sizePx + '" height="' + sizePx + '" fill="#fff"/>' + rects + '<\/svg>';
+  }
+
+  // 生成单个追溯码明文
+  function buildCode(prefix, batch, seq) {
+    return prefix + "-" + batch + "-" + pad(seq, 4);
+  }
+
+  // 生成二维码 URL（与生成器逻辑一致，扫码跳转到查询页）
+  function buildQrContent(d, code) {
+    const fullData = { c: code, n: d.n, s: d.s, b: d.b, d: d.d, o: d.o };
+    const b64 = b64EncodeUtf8(JSON.stringify(fullData));
+    const prefix = d.u || "https://lie310225.github.io/trace-pages/";
+    const sep = /[?&]$/.test(prefix) ? "" : (prefix.indexOf("?") >= 0 ? "&" : "?");
+    return prefix + sep + "d=" + b64;
+  }
+
+  function renderError(msg) {
+    document.getElementById("infoBar").style.display = "none";
+    document.getElementById("printGrid").innerHTML =
+      '<div class="error-box"><div class="icon">!</div><div>' + escapeHtml(msg) + '</div></div>';
+  }
+
+  function init() {
+    const pParam = getQuery("p");
+    if (!pParam) { renderError("未提供打印数据（URL 缺少 p 参数）"); return; }
+    const json = b64DecodeUtf8(pParam);
+    if (!json) { renderError("打印数据解码失败"); return; }
+    let d;
+    try { d = JSON.parse(json); }
+    catch (e) { renderError("打印数据格式错误"); return; }
+    if (!d.n || !d.b) { renderError("打印数据缺少产品名或批次号"); return; }
+
+    const w = d.w || 40, h = d.h || 30;
+    const prefix = d.x || "TR";
+    const start = d.q || 1;
+    const count = Math.max(1, Math.min(d.c || 10, 100));
+
+    // 二维码像素尺寸（与生成器一致，按标签宽高自适应）
+    const MM_TO_PX = 3.7795;
+    const textHeightMm = 9;
+    const paddingMm = 2;
+    const maxQrByW = (w - paddingMm) * MM_TO_PX;
+    const maxQrByH = (h - textHeightMm - paddingMm) * MM_TO_PX;
+    const qrPx = Math.max(30, Math.min(120, Math.floor(Math.min(maxQrByW, maxQrByH))));
+
+    document.documentElement.style.setProperty("--lw", w + "mm");
+    document.documentElement.style.setProperty("--lh", h + "mm");
+
+    const grid = document.getElementById("printGrid");
+    grid.innerHTML = "";
+
+    for (let i = 0; i < count; i++) {
+      const seq = start + i;
+      const code = buildCode(prefix, d.b, seq);
+      const qrContent = buildQrContent(d, code);
+      const lbl = document.createElement("div");
+      lbl.className = "print-label";
+      lbl.style.width = w + "mm";
+      lbl.style.height = h + "mm";
+      let svg = "";
+      try { svg = svgQrString(qrContent, qrPx) || ""; } catch (e) { svg = ""; }
+      lbl.innerHTML =
+        '<div class="p-product">' + escapeHtml(d.n) + '</div>' +
+        '<div class="p-spec">' + escapeHtml(d.s || "") + '</div>' +
+        '<div class="qr-img">' + svg + '</div>' +
+        '<div class="p-code">' + escapeHtml(code) + '</div>' +
+        '<div class="p-batch">批:' + escapeHtml(d.b) + ' | ' + escapeHtml(d.d || "") + '</div>';
+      grid.appendChild(lbl);
+    }
+
+    document.getElementById("infoBar").textContent =
+      "共 " + count + " 个追溯码 · " + w + "x" + h + "mm 标签 · 在叮当小印 APP 里点打印按钮";
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>

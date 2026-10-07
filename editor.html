@@ -495,6 +495,10 @@
       const qrContent = buildQrContent(d, code);
       let svg = "";
       try { svg = svgQrString(qrContent, qrPx) || ""; } catch (e) { svg = ""; }
+      // 强制 SVG 撑满 .qr-img 容器（与 print.html 一致，避免 APP webview 切掉）
+      if (svg) {
+        svg = svg.replace('<svg ', '<svg style="width:100%;height:100%;display:block;" ');
+      }
       let html = '<div class="print-label" style="aspect-ratio:' + w + ' / ' + h + ';font-size:calc(7pt * ' + d.fS + ');">';
       html += '<div class="text-col">';
       if (d.sp) html += '<div class="p-product" style="font-size:calc(7pt * ' + d.fS + ')">' + escapeHtml(d.n) + '</div>';

@@ -271,7 +271,10 @@
       const qrContent = buildQrContent(d, code);
       let svg = "";
       try { svg = svgQrString(qrContent, qrPx) || ""; } catch (e) { svg = ""; }
-      // SVG 在固定 mm 容器里居中显示（max-width/max-height 限制不超出）
+      // 强制 SVG 撑满 .qr-img 容器（inline style 优先级最高，避免 APP webview 不支持 max-width 切掉二维码）
+      if (svg) {
+        svg = svg.replace('<svg ', '<svg style="width:100%;height:100%;display:block;" ');
+      }
       let html = '<div class="print-label" style="aspect-ratio:' + w + ' / ' + h + ';">';
       html += '<div class="text-col">';
       if (sp) html += '<div class="p-product" style="font-size:calc(7pt * ' + fS + ')">' + escapeHtml(d.n) + '</div>';

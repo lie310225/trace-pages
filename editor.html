@@ -499,7 +499,7 @@
       if (svg) {
         svg = svg.replace('<svg ', '<svg style="width:100%;height:100%;display:block;" ');
       }
-      let html = '<div class="print-label" style="aspect-ratio:' + w + ' / ' + h + ';font-size:calc(7pt * ' + d.fS + ');">';
+      let html = '<div class="print-label" style="width:' + w + 'mm;height:' + h + 'mm;max-width:100%;font-size:calc(7pt * ' + d.fS + ');">';
       html += '<div class="text-col">';
       if (d.sp) html += '<div class="p-product" style="font-size:calc(7pt * ' + d.fS + ')">' + escapeHtml(d.n) + '</div>';
       if (d.ss) html += '<div class="p-spec" style="font-size:calc(6.5pt * ' + d.fS + ')">' + escapeHtml(d.s) + '</div>';
@@ -507,7 +507,7 @@
       if (d.sb) html += '<div class="p-batch" style="font-size:calc(6pt * ' + d.fS + ')">批:' + escapeHtml(d.b) + ' | ' + escapeHtml(d.d) + '</div>';
       if (d.ct) html += '<div class="p-custom" style="font-size:calc(6pt * ' + d.fS + ')">' + escapeHtml(d.ct) + '</div>';
       html += '</div>';
-      html += '<div class="qr-img" style="width:' + qrMm + 'mm;height:' + qrMm + 'mm;">' + svg + '</div>';
+      html += '<div class="qr-img" style="width:' + qrMm + 'mm;height:' + qrMm + 'mm;max-width:50%;">' + svg + '</div>';
       html += '</div>';
       labels.push(html);
     }

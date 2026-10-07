@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>追溯码生成器 · 一物一码批量打印</title>
+<script src="qrcodegen.js"></script>
+<style>
+  :root {
+    --primary: #2563eb;
+    --primary-dark: #1e40af;
+    --bg: #f7f8fc;
+    --card: #ffffff;
+    --border: #e2e8f0;
+    --text: #1e293b;
+    --muted: #64748b;
+    --success: #16a34a;
+    --danger: #dc2626;
+    --shadow: 0 2px 12px rgba(0,0,0,.06);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+    padding: 16px;
+  }
+  .container { max-width: 1200px; margin: 0 auto; }
+
+  header {
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    color: #fff;
+    padding: 18px 20px;
+    border-radius: 10px;
+    margin-bottom: 18px;
+    box-shadow: var(--shadow);
+  }
+  header h1 { font-size: 20px; font-weight: 600; margin-bottom: 4px; }
+  header p { font-size: 13px; opacity: .9; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+  @media (min-width: 900px) {
+    .grid { grid-template-columns: 360px 1fr; }
+  }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px;
+    box-shadow: var(--shadow);
+  }
+  .card h2 {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+    color: var(--primary-dark);
+  }
+
+  .field { margin-bottom: 14px; }
+  .field label {
+    display: block;
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 6px;
+    font-weight: 500;
+  }
+  .field label .req { color: var(--danger); margin-left: 2px; }
+  .field input,
+  .field select,
+  .field textarea {
+    width: 100%;
+    padding: 9px 11px;
+    font-size: 14px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: #fff;
+    color: var(--text);
+    transition: border-color .15s, box-shadow .15s;
+    font-family: inherit;
+  }
+  .field input:focus,
+  .field select:focus,
+  .field textarea:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(37,99,235,.12);
+  }
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .field-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+
+  .hint { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px 16px;
+    font-size: 14px;
+    font-weight: 500;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all .15s;
+    font-family: inherit;
+    text-decoration: none;
+  }
+  .btn-primary { background: var(--primary); color: #fff; }
+  .btn-primary:hover { background: var(--primary-dark); }
+  .btn-success { background: var(--success); color: #fff; }
+  .btn-success:hover { filter: brightness(.92); }
+  .btn-ghost { background: #fff; color: var(--text); border: 1px solid var(--border); }
+  .btn-ghost:hover { background: #f1f5f9; }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .btn-block { width: 100%; }
+
+  .actions { display: flex; gap: 10px; margin-top: 8px; flex-wrap: wrap; }
+
+  .preview-area {
+    background: #f1f5f9;
+    border-radius: 8px;
+    padding: 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 200px;
+  }
+  .preview-label {
+    background: #fff;
+    border: 1px dashed var(--border);
+    padding: 8px;
+    border-radius: 4px;
+    text-align: center;
+  }
+  .preview-label .code { font-size: 11px; color: var(--muted); margin-top: 4px; font-family: "Courier New", monospace; }
+  .preview-label .product { font-size: 11px; color: var(--text); font-weight: 500; }
+
+  .empty-state {
+    text-align: center;
+    color: var(--muted);
+    font-size: 13px;
+    padding: 40px 0;
+  }
+
+  .results-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .results-count { font-size: 13px; color: var(--muted); }
+  .results-count strong { color: var(--success); font-size: 15px; }
+
+  .results-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 10px;
+    max-height: 600px;
+    overflow-y: auto;
+    padding: 4px;
+  }
+  .result-item {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px;
+    text-align: center;
+    transition: box-shadow .15s;
+  }
+  .result-item:hover { box-shadow: 0 4px 12px rgba(0,0,0,.08); }
+  .result-item .product { font-size: 11px; color: var(--text); font-weight: 500; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .result-item .code { font-size: 11px; color: var(--muted); margin-top: 4px; font-family: "Courier New", monospace; }
+  .result-item img { display: block; margin: 0 auto; }
+
+  .alert {
+    padding: 10px 14px;
+    border-radius: 6px;
+    font-size: 13px;
+    margin-bottom: 12px;
+  }
+  .alert-info { background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; }
+  .alert-error { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+
+  .tag {
+    display: inline-block;
+    padding: 2px 8px;
+    background: #eff6ff;
+    color: var(--primary);
+    border-radius: 10px;
+    font-size: 11px;
+    margin-right: 4px;
+  }
+
+  /* ====== 打印样式 ====== */
+  @media print {
+    body { background: #fff; padding: 0; }
+    header, .card, .actions, .results-header, .empty-state, .preview-area, .alert { display: none !important; }
+    .print-area { display: block !important; }
+    @page {
+      margin: 5mm;
+    }
+  }
+  .print-area { display: none; }
+  .print-label {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5mm 1mm;
+    text-align: center;
+    vertical-align: top;
+    page-break-inside: avoid;
+    line-height: 1.1;
+    box-sizing: border-box;
+  }
+  .print-label .p-product {
+    font-size: 7pt;
+    font-weight: 600;
+    width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .print-label .p-spec {
+    font-size: 6.5pt;
+    color: #333;
+    width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .print-label .qr-img {
+    flex: 1 1 auto;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 0;
+    width: 100%;
+    overflow: hidden;
+  }
+  .print-label .qr-img svg { display: block; }
+  .print-label .p-code {
+    font-size: 7.5pt;
+    font-family: "Courier New", monospace;
+    font-weight: 600;
+    width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .print-label .p-batch {
+    font-size: 6pt;
+    color: #555;
+    width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>追溯码生成器</h1>
+    <p>一物一码 · 二维码批量生成 · 适配叮当小印标签打印</p>
+  </header>
+
+  <div class="grid">
+    <!-- 左侧表单区 -->
+    <section class="card">
+      <h2>产品批次信息</h2>
+      <div id="alertBox"></div>
+      <div class="field">
+        <label>产品名称<span class="req">*</span></label>
+        <input type="text" id="productName" placeholder="例：蓝山咖啡豆" value="测试产品">
+      </div>
+      <div class="field">
+        <label>规格型号</label>
+        <input type="text" id="spec" placeholder="例：250g/袋" value="250g">
+      </div>
+      <div class="field">
+        <label>生产企业</label>
+        <input type="text" id="company" placeholder="例：XX食品有限公司" value="示例企业">
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>批次号<span class="req">*</span></label>
+          <input type="text" id="batchNo" placeholder="B202610" value="B20261007">
+        </div>
+        <div class="field">
+          <label>生产日期<span class="req">*</span></label>
+          <input type="date" id="prodDate">
+        </div>
+      </div>
+      <div class="field-row-3">
+        <div class="field">
+          <label>追溯码前缀</label>
+          <input type="text" id="prefix" placeholder="TR" value="TR" maxlength="6">
+        </div>
+        <div class="field">
+          <label>起始流水号</label>
+          <input type="number" id="startSeq" value="1" min="1" max="9999">
+        </div>
+        <div class="field">
+          <label>生成数量<span class="req">*</span></label>
+          <input type="number" id="count" value="10" min="1" max="100">
+        </div>
+      </div>
+      <div class="field">
+        <label>标签规格（叮当小印）</label>
+        <select id="labelSize">
+          <option value="30x20">30 × 20 mm（小号）</option>
+          <option value="40x30" selected>40 × 30 mm（标准）</option>
+          <option value="50x30">50 × 30 mm（中号）</option>
+          <option value="60x40">60 × 40 mm（大号）</option>
+          <option value="custom">自定义</option>
+        </select>
+        <div class="hint">选择对应的标签纸规格，自动适配打印排版</div>
+      </div>
+      <div class="field-row" id="customSizeRow" style="display:none;">
+        <div class="field">
+          <label>宽 (mm)</label>
+          <input type="number" id="customW" value="40" min="10" max="100">
+        </div>
+        <div class="field">
+          <label>高 (mm)</label>
+          <input type="number" id="customH" value="30" min="10" max="100">
+        </div>
+      </div>
+      <div class="field">
+        <label>二维码尺寸 (像素)</label>
+        <input type="range" id="qrSize" min="60" max="200" value="100" step="10">
+        <div class="hint">当前：<span id="qrSizeVal">100</span> px</div>
+      </div>
+      <div class="field">
+        <label>二维码内容模式</label>
+        <select id="qrMode">
+          <option value="url" selected>跳转查询页（推荐，扫码看完整中文，绝不乱码）</option>
+          <option value="code">仅追溯码（最简洁）</option>
+          <option value="full">完整文本（部分手机可能乱码，不推荐）</option>
+        </select>
+        <div class="hint">微信/支付宝扫码乱码请选「跳转查询页」</div>
+      </div>
+      <div class="field" id="urlPrefixField">
+        <label>查询页网址</label>
+        <input type="text" id="urlPrefix" placeholder="https://你的域名/" value="https://lie310225.github.io/trace-pages/">
+        <div class="hint">把同目录下的 <code>trace.html</code> 部署到任意静态托管（如腾讯云COS/阿里云OSS/GitHub Pages/公司服务器），把访问地址填在这里。完整中文信息会自动编码到URL中。</div>
+      </div>
+      <div class="actions">
+        <button class="btn btn-primary btn-block" id="generateBtn">生成追溯码</button>
+        <button class="btn btn-ghost btn-block" id="resetBtn">重置</button>
+      </div>
+    </section>
+
+    <!-- 右侧预览+结果区 -->
+    <section class="card">
+      <h2>实时预览</h2>
+      <div class="preview-area">
+        <div class="preview-label" id="previewLabel">
+          <div class="product">预览产品名</div>
+          <div id="previewQr"></div>
+          <div class="code">TR-B20261007-0001</div>
+        </div>
+      </div>
+
+      <h2 style="margin-top: 20px;">生成结果</h2>
+      <div class="results-header">
+        <div class="results-count">共生成 <strong id="totalCount">0</strong> 条追溯码</div>
+        <div class="actions" style="margin: 0;">
+          <button class="btn btn-success" id="printBtn" disabled>批量打印</button>
+          <button class="btn btn-ghost" id="exportBtn" disabled>导出CSV</button>
+          <button class="btn btn-ghost" id="clearBtn" disabled>清空</button>
+        </div>
+      </div>
+      <div class="results-grid" id="resultsGrid">
+        <div class="empty-state">填写左侧表单后点击「生成追溯码」<br>结果将在此显示</div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<!-- 打印区域（仅打印时显示） -->
+<div class="print-area" id="printArea"></div>
+
+<script>
+(function() {
+  "use strict";
+
+  // ============ 类型定义 / 常量 ============
+  const LABEL_PRESETS = {
+    "30x20": { w: 30, h: 20, qrPx: 70, cols: 6 },
+    "40x30": { w: 40, h: 30, qrPx: 90, cols: 5 },
+    "50x30": { w: 50, h: 30, qrPx: 100, cols: 4 },
+    "60x40": { w: 60, h: 40, qrPx: 120, cols: 3 }
+  };
+
+  // ============ 工具函数 ============
+  function $(id) { return document.getElementById(id); }
+
+  function pad(num, len) {
+    let s = String(num);
+    while (s.length < len) s = "0" + s;
+    return s;
+  }
+
+  function todayStr() {
+    const d = new Date();
+    return d.getFullYear() + "-" + pad(d.getMonth() + 1, 2) + "-" + pad(d.getDate(), 2);
+  }
+
+  function showAlert(msg, type) {
+    const box = $("alertBox");
+    if (!msg) { box.innerHTML = ""; return; }
+    box.innerHTML = `<div class="alert alert-${type || "info"}">${escapeHtml(msg)}</div>`;
+  }
+
+  function escapeHtml(s) {
+    if (s == null) return "";
+    return String(s).replace(/[&<>"']/g, c => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    }[c]));
+  }
+
+  // 生成单个追溯码明文
+  function buildCode(prefix, batch, seq) {
+    return `${prefix}-${batch}-${pad(seq, 4)}`;
+  }
+
+  // 根据模式生成二维码内容
+  function buildQrContent(data, code) {
+    const mode = data.qrMode || "code";
+    if (mode === "url") {
+      const prefix = (data.urlPrefix || "").trim();
+      // 未配置前缀时退化为仅追溯码，避免生成无效链接
+      if (!prefix) return code;
+      // 把完整中文信息 base64 编码后放进 URL（纯 ASCII，扫码绝不乱码）
+      // 字段名缩短以减小二维码密度，加速扫码识别（trace.html 兼容新旧字段）
+      const fullData = {
+        c: code,
+        n: data.productName,
+        s: data.spec,
+        b: data.batchNo,
+        d: data.prodDate,
+        o: data.company
+      };
+      const json = JSON.stringify(fullData);
+      const b64 = b64EncodeUtf8(json);
+      // 拼接 URL：前缀末尾自动加 ? 或 &
+      const sep = /[?&]$/.test(prefix) ? "" : (prefix.indexOf("?") >= 0 ? "&" : "?");
+      return prefix + sep + "d=" + b64;
+    }
+    if (mode === "full") {
+      // 单行 + 分隔符格式（仍可能部分手机乱码，建议用 URL 模式）
+      return [
+        `产品:${data.productName}`,
+        `规格:${data.spec}`,
+        `批次:${data.batchNo}`,
+        `追溯码:${code}`,
+        `生产日期:${data.prodDate}`,
+        `企业:${data.company}`
+      ].join("  |  ");
+    }
+    // 默认：仅追溯码（最简洁，扫码显示编码字符串）
+    return code;
+  }
+
+  // UTF-8 安全的 base64 编码（支持中文）
+  function b64EncodeUtf8(str) {
+    const bytes = new TextEncoder().encode(str);
+    let binary = "";
+    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+    return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+
+  // 用 SVG 渲染二维码（不依赖 Image，file:// 协议下也能稳定工作）
+  function renderQrSvg(container, text, sizePx) {
+    container.innerHTML = "";
+    if (typeof qrcode === "undefined") {
+      container.innerHTML = `<div style="color:#dc2626;font-size:11px;padding:6px;">二维码库未加载</div>`;
+      return null;
+    }
+    try {
+      // typeNumber=0 自动选择版本，'M' 中等纠错级别
+      const qr = qrcode(0, "M");
+      qr.addData(text);
+      qr.make();
+      const n = qr.getModuleCount();
+      const cell = sizePx / n;
+      let rects = "";
+      for (let r = 0; r < n; r++) {
+        for (let c = 0; c < n; c++) {
+          if (qr.isDark(r, c)) {
+            rects += `<rect x="${(c * cell).toFixed(3)}" y="${(r * cell).toFixed(3)}" width="${cell.toFixed(3)}" height="${cell.toFixed(3)}" fill="#000"/>`;
+          }
+        }
+      }
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${sizePx}" height="${sizePx}" viewBox="0 0 ${sizePx} ${sizePx}" shape-rendering="crispEdges"><rect width="${sizePx}" height="${sizePx}" fill="#fff"/>${rects}</svg>`;
+      container.innerHTML = svg;
+      return svg;
+    } catch (e) {
+      container.innerHTML = `<div style="color:#dc2626;font-size:11px;padding:6px;">${escapeHtml(e.message || String(e))}</div>`;
+      return null;
+    }
+  }
+
+  // 读取表单数据
+  function readForm() {
+    return {
+      productName: $("productName").value.trim(),
+      spec: $("spec").value.trim(),
+      company: $("company").value.trim(),
+      batchNo: $("batchNo").value.trim(),
+      prodDate: $("prodDate").value,
+      prefix: $("prefix").value.trim() || "TR",
+      startSeq: parseInt($("startSeq").value, 10) || 1,
+      count: parseInt($("count").value, 10) || 1,
+      labelSize: $("labelSize").value,
+      customW: parseInt($("customW").value, 10) || 40,
+      customH: parseInt($("customH").value, 10) || 30,
+      qrSize: parseInt($("qrSize").value, 10) || 100,
+      qrMode: $("qrMode").value,
+      urlPrefix: $("urlPrefix").value.trim()
+    };
+  }
+
+  // 验证表单
+  function validateForm(data) {
+    if (!data.productName) return "请填写产品名称";
+    if (!data.batchNo) return "请填写批次号";
+    if (!data.prodDate) return "请选择生产日期";
+    if (data.count < 1 || data.count > 100) return "生成数量需在 1-100 之间";
+    if (data.startSeq < 1 || data.startSeq > 9999) return "起始流水号需在 1-9999 之间";
+    if (data.startSeq + data.count - 1 > 99999) return "流水号超出 5 位上限，请调整起始号或数量";
+    if (data.qrMode === "url" && !data.urlPrefix) {
+      return "请填写「查询页网址」（同目录下 trace.html 部署后的访问地址）";
+    }
+    return null;
+  }
+
+  // 获取标签尺寸预设
+  function getLabelConfig(data) {
+    if (data.labelSize === "custom") {
+      const w = data.customW, h = data.customH;
+      let qrPx = 70;
+      if (w >= 50 && h >= 30) qrPx = 100;
+      else if (w >= 40) qrPx = 90;
+      const cols = Math.max(1, Math.floor(180 / w));
+      return { w, h, qrPx, cols };
+    }
+    return LABEL_PRESETS[data.labelSize] || LABEL_PRESETS["40x30"];
+  }
+
+  // ============ 实时预览 ============
+  function updatePreview() {
+    const data = readForm();
+    const cfg = getLabelConfig(data);
+    const previewQr = $("previewQr");
+    previewQr.innerHTML = "";
+    const seq = data.startSeq;
+    const code = buildCode(data.prefix, data.batchNo || "BATCH", seq);
+    $("previewLabel").querySelector(".product").textContent = data.productName || "预览产品名";
+    $("previewLabel").querySelector(".code").textContent = code;
+    const qrContent = buildQrContent({
+      productName: data.productName || "预览产品名",
+      spec: data.spec || "",
+      batchNo: data.batchNo || "BATCH",
+      prodDate: data.prodDate || todayStr(),
+      company: data.company || "",
+      qrMode: data.qrMode,
+      urlPrefix: data.urlPrefix
+    }, code);
+    try {
+      renderQrSvg(previewQr, qrContent, Math.min(cfg.qrPx, data.qrSize));
+    } catch (e) {
+      console.warn("QR preview failed", e);
+    }
+  }
+
+  // ============ 主流程：生成追溯码 ============
+  function generate() {
+    const data = readForm();
+    const err = validateForm(data);
+    if (err) { showAlert(err, "error"); return; }
+    showAlert("", "");
+
+    const cfg = getLabelConfig(data);
+    const grid = $("resultsGrid");
+    grid.innerHTML = "";
+    const codes = [];
+
+    for (let i = 0; i < data.count; i++) {
+      const seq = data.startSeq + i;
+      const code = buildCode(data.prefix, data.batchNo, seq);
+      const qrContent = buildQrContent(data, code);
+      codes.push({ code, qrContent, data: { ...data } });
+
+      const item = document.createElement("div");
+      item.className = "result-item";
+      item.innerHTML = `
+        <div class="product" title="${escapeHtml(data.productName)}">${escapeHtml(data.productName)}</div>
+        <div class="qr-box"></div>
+        <div class="code">${escapeHtml(code)}</div>
+        <div class="code" style="font-size:10px;">批:${escapeHtml(data.batchNo)}</div>
+      `;
+      grid.appendChild(item);
+      const qrBox = item.querySelector(".qr-box");
+      try {
+        renderQrSvg(qrBox, qrContent, Math.min(cfg.qrPx, data.qrSize));
+      } catch (e) {
+        qrBox.textContent = "二维码生成失败";
+      }
+    }
+
+    $("totalCount").textContent = String(codes.length);
+    $("printBtn").disabled = false;
+    $("exportBtn").disabled = false;
+    $("clearBtn").disabled = false;
+
+    // 缓存到全局，供打印/导出使用
+    window.__codes = codes;
+    window.__cfg = cfg;
+
+    // 渲染打印区域
+    renderPrintArea(codes, cfg);
+  }
+
+  // ============ 打印区域渲染 ============
+  function renderPrintArea(codes, cfg) {
+    const area = $("printArea");
+    area.innerHTML = "";
+    area.style.cssText = `
+      display: none;
+      font-size: 0;
+      text-align: left;
+    `;
+    // mm → px (96 DPI: 1mm ≈ 3.7795px)
+    const MM_TO_PX = 3.7795;
+    // 文字行估算：产品名7pt + 规格6.5pt + 追溯码7.5pt + 批次6pt ≈ 27pt
+    // 96 DPI 下 1pt ≈ 1.333px，27pt ≈ 36px ≈ 9.5mm；含 padding 1mm，共约 10mm
+    const textHeightMm = 9;
+    const paddingMm = 2;
+    // 二维码像素尺寸：用户设置、宽度限制、高度限制三者取最小
+    const maxQrByW = (cfg.w - paddingMm) * MM_TO_PX;
+    const maxQrByH = (cfg.h - textHeightMm - paddingMm) * MM_TO_PX;
+    const qrPx = Math.max(30, Math.min(cfg.qrPx, Math.floor(Math.min(maxQrByW, maxQrByH))));
+
+    codes.forEach(item => {
+      const lbl = document.createElement("div");
+      lbl.className = "print-label";
+      lbl.style.cssText = `
+        width: ${cfg.w}mm;
+        height: ${cfg.h}mm;
+        margin: 0.5mm;
+        border: 1px dashed #ccc;
+        box-sizing: border-box;
+      `;
+      lbl.innerHTML = `
+        <div class="p-product">${escapeHtml(item.data.productName)}</div>
+        <div class="p-spec">${escapeHtml(item.data.spec)}</div>
+        <div class="qr-img"></div>
+        <div class="p-code">${escapeHtml(item.code)}</div>
+        <div class="p-batch">批:${escapeHtml(item.data.batchNo)} | ${escapeHtml(item.data.prodDate)}</div>
+      `;
+      area.appendChild(lbl);
+      const qrImg = lbl.querySelector(".qr-img");
+      try {
+        renderQrSvg(qrImg, item.qrContent, qrPx);
+      } catch (e) {
+        qrImg.textContent = "QR失败";
+      }
+    });
+  }
+
+  // ============ 批量打印 ============
+  function doPrint() {
+    if (!window.__codes || !window.__codes.length) {
+      showAlert("请先生成追溯码", "error");
+      return;
+    }
+    window.print();
+  }
+
+  // ============ 导出 CSV ============
+  function doExport() {
+    if (!window.__codes || !window.__codes.length) return;
+    const header = ["追溯码", "产品名称", "规格", "批次号", "生产日期", "企业", "二维码内容"];
+    const rows = window.__codes.map(it => [
+      it.code,
+      it.data.productName,
+      it.data.spec,
+      it.data.batchNo,
+      it.data.prodDate,
+      it.data.company,
+      it.qrContent.replace(/\n/g, " | ")
+    ]);
+    const csv = [header, ...rows].map(r =>
+      r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(",")
+    ).join("\r\n");
+    // BOM 保证 Excel 识别 UTF-8
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `追溯码_${window.__codes[0].data.batchNo}_${dateStamp()}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function dateStamp() {
+    const d = new Date();
+    return d.getFullYear() + pad(d.getMonth() + 1, 2) + pad(d.getDate(), 2);
+  }
+
+  // ============ 清空 ============
+  function doClear() {
+    $("resultsGrid").innerHTML = `<div class="empty-state">填写左侧表单后点击「生成追溯码」<br>结果将在此显示</div>`;
+    $("totalCount").textContent = "0";
+    $("printBtn").disabled = true;
+    $("exportBtn").disabled = true;
+    $("clearBtn").disabled = true;
+    $("printArea").innerHTML = "";
+    window.__codes = null;
+  }
+
+  // ============ 事件绑定 ============
+  function bindEvents() {
+    $("generateBtn").addEventListener("click", generate);
+    $("resetBtn").addEventListener("click", () => {
+      doClear();
+      $("productName").value = "";
+      $("spec").value = "";
+      $("company").value = "";
+      $("batchNo").value = "";
+      $("prodDate").value = todayStr();
+      $("prefix").value = "TR";
+      $("startSeq").value = "1";
+      $("count").value = "10";
+      $("qrMode").value = "url";
+      $("urlPrefix").value = "";
+      $("urlPrefixField").style.display = "block";
+      updatePreview();
+    });
+    $("printBtn").addEventListener("click", doPrint);
+    $("exportBtn").addEventListener("click", doExport);
+    $("clearBtn").addEventListener("click", doClear);
+
+    $("labelSize").addEventListener("change", e => {
+      $("customSizeRow").style.display = e.target.value === "custom" ? "grid" : "none";
+      updatePreview();
+    });
+
+    $("qrSize").addEventListener("input", e => {
+      $("qrSizeVal").textContent = e.target.value;
+      updatePreview();
+    });
+
+    $("qrMode").addEventListener("change", e => {
+      $("urlPrefixField").style.display = e.target.value === "url" ? "block" : "none";
+      updatePreview();
+    });
+
+    ["productName", "spec", "company", "batchNo", "prodDate", "prefix", "startSeq", "count", "customW", "customH", "urlPrefix"]
+      .forEach(id => $(id).addEventListener("input", updatePreview));
+  }
+
+  // ============ 初始化 ============
+  function init() {
+    $("prodDate").value = todayStr();
+    bindEvents();
+    if (typeof qrcode === "undefined") {
+      showAlert("二维码库未加载：请确认 qrcodegen.js 与本 HTML 在同一目录", "error");
+    }
+    updatePreview();
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>

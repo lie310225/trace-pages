@@ -191,12 +191,12 @@
 
   function renderInfo(data) {
     const rows = [
-      { label: "追溯码", value: data.code, cls: "code" },
-      { label: "产品名称", value: data.productName },
-      { label: "规格型号", value: data.spec },
-      { label: "批次号", value: data.batchNo },
-      { label: "生产日期", value: data.prodDate },
-      { label: "生产企业", value: data.company }
+      { label: "追溯码", value: data.code || data.c, cls: "code" },
+      { label: "产品名称", value: data.productName || data.n },
+      { label: "规格型号", value: data.spec || data.s },
+      { label: "批次号", value: data.batchNo || data.b },
+      { label: "生产日期", value: data.prodDate || data.d },
+      { label: "生产企业", value: data.company || data.o }
     ].filter(r => r.value);
 
     const html = `

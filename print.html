@@ -124,10 +124,6 @@
       <option value="5">5 个</option>
     </select>
   </label>
-  <label>二维码
-    <input type="range" id="qrScale" min="0.6" max="1.5" step="0.05" value="1">
-    <span class="val" id="qrScaleVal">1.00</span>
-  </label>
   <label>间距
     <select id="gapSel">
       <option value="0mm">无</option>
@@ -259,10 +255,9 @@
 
     const grid = document.getElementById("printGrid");
     grid.innerHTML = "";
-    // 让标签按宽高比自适应；--cols 决定每行几个，aspect-ratio 让高度跟随宽度
-    document.documentElement.style.setProperty("--lw", w + "mm");
-    document.documentElement.style.setProperty("--lh", h + "mm");
-    grid.style.setProperty("aspect-auto", "1");
+    // 显式设置每行标签数（与 editor.html 预览一致，避免只靠工具栏事件）
+    const cols = Math.max(1, Math.min(parseInt(d.cols, 10) || 1, 5));
+    grid.style.gridTemplateColumns = "repeat(" + cols + ", 1fr)";
 
     const labels = [];
     for (let i = 0; i < count; i++) {
@@ -275,7 +270,8 @@
       if (svg) {
         svg = svg.replace('<svg ', '<svg style="width:100%;height:100%;display:block;" ');
       }
-      let html = '<div class="print-label" style="aspect-ratio:' + w + ' / ' + h + ';">';
+      // 用显式 width/height mm 替代 aspect-ratio（旧版 Android WebView 不支持 aspect-ratio 会导致高度坍塌）
+      let html = '<div class="print-label" style="width:' + w + 'mm;height:' + h + 'mm;max-width:100%;">';
       html += '<div class="text-col">';
       if (sp) html += '<div class="p-product" style="font-size:calc(7pt * ' + fS + ')">' + escapeHtml(d.n) + '</div>';
       if (ss) html += '<div class="p-spec" style="font-size:calc(6.5pt * ' + fS + ')">' + escapeHtml(d.s || "") + '</div>';
@@ -283,7 +279,7 @@
       if (sb) html += '<div class="p-batch" style="font-size:calc(6pt * ' + fS + ')">批:' + escapeHtml(d.b) + ' | ' + escapeHtml(d.d || "") + '</div>';
       if (ct) html += '<div class="p-custom" style="font-size:calc(6pt * ' + fS + ');color:#555;width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(ct) + '</div>';
       html += '</div>';
-      html += '<div class="qr-img" style="width:' + qrMm + 'mm;height:' + qrMm + 'mm;">' + svg + '</div>';
+      html += '<div class="qr-img" style="width:' + qrMm + 'mm;height:' + qrMm + 'mm;max-width:50%;">' + svg + '</div>';
       html += '</div>';
       labels.push(html);
     }
@@ -296,19 +292,15 @@
   // 工具栏交互
   function bindToolbar() {
     const colsSel = document.getElementById("colsSel");
-    const qrScale = document.getElementById("qrScale");
-    const qrScaleVal = document.getElementById("qrScaleVal");
     const gapSel = document.getElementById("gapSel");
 
     colsSel.addEventListener("change", () => {
-      document.documentElement.style.setProperty("--cols", colsSel.value);
-    });
-    qrScale.addEventListener("input", () => {
-      document.documentElement.style.setProperty("--qr-scale", qrScale.value);
-      qrScaleVal.textContent = parseFloat(qrScale.value).toFixed(2);
+      const grid = document.getElementById("printGrid");
+      grid.style.gridTemplateColumns = "repeat(" + colsSel.value + ", 1fr)";
     });
     gapSel.addEventListener("change", () => {
-      document.documentElement.style.setProperty("--gap", gapSel.value);
+      const grid = document.getElementById("printGrid");
+      grid.style.gap = gapSel.value;
     });
   }
 
@@ -324,6 +316,11 @@
 
     decodedData = d;
     document.getElementById("toolbar").style.display = "flex";
+    // 同步工具栏下拉与 URL 参数
+    const colsSel = document.getElementById("colsSel");
+    if (colsSel) colsSel.value = String(Math.max(1, Math.min(parseInt(d.cols, 10) || 1, 5)));
+    const gapSel = document.getElementById("gapSel");
+    if (gapSel && d.gap) gapSel.value = d.gap;
     bindToolbar();
     renderLabels();
   }

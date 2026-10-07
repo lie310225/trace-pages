@@ -245,7 +245,7 @@
       if (json) {
         try {
           const data = JSON.parse(json);
-          if (data && data.code) {
+          if (data && (data.code || data.c)) {
             renderInfo(data);
             return;
           }

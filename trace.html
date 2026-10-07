@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>产品追溯查询</title>
+<style>
+  :root {
+    --primary: #2563eb;
+    --primary-dark: #1e40af;
+    --success: #16a34a;
+    --bg: #f7f8fc;
+    --card: #ffffff;
+    --border: #e2e8f0;
+    --text: #1e293b;
+    --muted: #64748b;
+    --danger: #dc2626;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+    min-height: 100vh;
+    padding: 16px;
+  }
+  .container { max-width: 600px; margin: 0 auto; }
+
+  header {
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    color: #fff;
+    padding: 24px 20px;
+    border-radius: 12px;
+    text-align: center;
+    margin-bottom: 16px;
+    box-shadow: 0 4px 16px rgba(37,99,235,.18);
+  }
+  header .icon { font-size: 36px; margin-bottom: 8px; }
+  header h1 { font-size: 18px; font-weight: 600; margin-bottom: 4px; }
+  header p { font-size: 12px; opacity: .9; }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 14px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.04);
+  }
+  .card h2 {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--muted);
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px dashed var(--border);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 10px 0;
+    border-bottom: 1px solid #f1f5f9;
+    font-size: 14px;
+  }
+  .info-row:last-child { border-bottom: none; }
+  .info-row .label {
+    color: var(--muted);
+    font-size: 13px;
+    flex-shrink: 0;
+    width: 90px;
+  }
+  .info-row .value {
+    color: var(--text);
+    font-weight: 500;
+    text-align: right;
+    word-break: break-all;
+    flex: 1;
+    margin-left: 12px;
+  }
+  .info-row .value.code {
+    font-family: "Courier New", monospace;
+    color: var(--primary-dark);
+    font-size: 15px;
+  }
+
+  .verify-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #dcfce7;
+    color: var(--success);
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 500;
+    margin-bottom: 14px;
+  }
+  .verify-badge .dot {
+    width: 8px;
+    height: 8px;
+    background: var(--success);
+    border-radius: 50%;
+    box-shadow: 0 0 0 4px rgba(22,163,74,.18);
+  }
+
+  .error-box {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--danger);
+  }
+  .error-box .icon { font-size: 48px; margin-bottom: 12px; }
+  .error-box h2 { color: var(--danger); border: none; padding: 0; justify-content: center; }
+  .error-box p { color: var(--muted); font-size: 13px; margin-top: 8px; }
+
+  footer {
+    text-align: center;
+    color: var(--muted);
+    font-size: 11px;
+    padding: 16px 0 8px;
+  }
+  footer a { color: var(--primary); text-decoration: none; }
+
+  @media (max-width: 380px) {
+    .info-row .label { width: 76px; font-size: 12px; }
+    .info-row .value { font-size: 13px; }
+    header h1 { font-size: 16px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div class="icon">✓</div>
+    <h1>产品追溯查询</h1>
+    <p>扫描追溯码查看产品完整信息</p>
+  </header>
+
+  <div id="content">
+    <div class="card">
+      <div class="error-box">
+        <div class="icon">⚠</div>
+        <h2>查询失败</h2>
+        <p id="errorMsg">未找到追溯信息</p>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <p>本追溯信息由生产企业发布 · 仅供真伪验证</p>
+  </footer>
+</div>
+
+<script>
+(function() {
+  "use strict";
+
+  // 解析 URL 参数
+  function getQuery(name) {
+    const m = new RegExp("[?&]" + name + "=([^&#]*)").exec(location.search);
+    return m ? decodeURIComponent(m[1]) : "";
+  }
+
+  // UTF-8 安全的 base64 解码（支持中文）
+  function b64DecodeUtf8(str) {
+    try {
+      // 处理 URL safe base64
+      str = str.replace(/-/g, "+").replace(/_/g, "/");
+      // base64 → 二进制字符串
+      const binary = atob(str);
+      // 二进制字符串 → UTF-8 字节
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      // UTF-8 字节 → 中文字符串
+      return new TextDecoder("utf-8").decode(bytes);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function escapeHtml(s) {
+    if (s == null) return "";
+    return String(s).replace(/[&<>"']/g, c => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    }[c]));
+  }
+
+  function renderInfo(data) {
+    const rows = [
+      { label: "追溯码", value: data.code, cls: "code" },
+      { label: "产品名称", value: data.productName },
+      { label: "规格型号", value: data.spec },
+      { label: "批次号", value: data.batchNo },
+      { label: "生产日期", value: data.prodDate },
+      { label: "生产企业", value: data.company }
+    ].filter(r => r.value);
+
+    const html = `
+      <div class="card">
+        <div class="verify-badge">
+          <span class="dot"></span>
+          <span>追溯码验证通过</span>
+        </div>
+        <h2>📋 产品信息</h2>
+        ${rows.map(r => `
+          <div class="info-row">
+            <span class="label">${r.label}</span>
+            <span class="value ${r.cls || ""}">${escapeHtml(r.value)}</span>
+          </div>
+        `).join("")}
+      </div>
+      <div class="card">
+        <h2>🔍 验证说明</h2>
+        <p style="font-size:13px;color:var(--muted);line-height:1.7;">
+          本追溯码由生产企业直接发布，确保产品来源可查、去向可追。<br>
+          如对产品真伪有疑问，请联系生产企业核实。
+        </p>
+      </div>
+    `;
+    document.getElementById("content").innerHTML = html;
+  }
+
+  function renderError(msg) {
+    document.getElementById("errorMsg").textContent = msg;
+    document.getElementById("content").innerHTML = `
+      <div class="card">
+        <div class="error-box">
+          <div class="icon">⚠</div>
+          <h2>查询失败</h2>
+          <p>${escapeHtml(msg)}</p>
+        </div>
+      </div>
+    `;
+  }
+
+  function init() {
+    // 优先读 d 参数（完整数据 base64）
+    const dParam = getQuery("d");
+    if (dParam) {
+      const json = b64DecodeUtf8(dParam);
+      if (json) {
+        try {
+          const data = JSON.parse(json);
+          if (data && data.code) {
+            renderInfo(data);
+            return;
+          }
+        } catch (e) {
+          console.warn("JSON parse failed", e);
+        }
+      }
+      renderError("追溯数据解码失败，请检查追溯码是否完整");
+      return;
+    }
+
+    // 兼容仅 code 参数（需后端数据源）
+    const codeParam = getQuery("code");
+    if (codeParam) {
+      renderError(`追溯码 ${codeParam} 未找到对应信息（演示数据未配置）`);
+      return;
+    }
+
+    renderError("未提供追溯码参数");
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>

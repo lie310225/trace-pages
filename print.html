@@ -64,37 +64,45 @@
   }
   .print-label {
     display: flex;
-    flex-direction: column;
-    align-items: center;
+    flex-direction: row;
+    align-items: stretch;
     justify-content: space-between;
     border: 1px dashed #999;
     box-sizing: border-box;
     padding: 0.5mm 1mm;
-    text-align: center;
+    text-align: left;
     overflow: hidden;
     page-break-inside: avoid;
     break-inside: avoid;
   }
-  .print-label .p-product { font-size: 7pt; font-weight: 600; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .print-label .p-spec { font-size: 6.5pt; color: #333; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .print-label .qr-img {
+  .print-label .text-col {
     flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    gap: 0.3mm;
+    padding-right: 1mm;
+    min-width: 0;
+    overflow: hidden;
+  }
+  .print-label .p-product { font-size: 7pt; font-weight: 600; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
+  .print-label .p-spec { font-size: 6.5pt; color: #333; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
+  .print-label .qr-img {
+    flex: 0 0 auto;
     display: flex;
     justify-content: center;
     align-items: center;
-    min-height: 0;
-    width: 100%;
+    min-width: 0;
     overflow: hidden;
   }
   .print-label .qr-img svg {
     display: block;
-    width: 100%;
-    height: 100%;
     max-width: 100%;
     max-height: 100%;
   }
-  .print-label .p-code { font-size: 7.5pt; font-family: "Courier New", monospace; font-weight: 600; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .print-label .p-batch { font-size: 6pt; color: #555; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .print-label .p-code { font-size: 7.5pt; font-family: "Courier New", monospace; font-weight: 600; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
+  .print-label .p-batch { font-size: 6pt; color: #555; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
   .error-box { padding: 30px 16px; text-align: center; color: #dc2626; font-size: 14px; }
   .error-box .icon { font-size: 36px; margin-bottom: 8px; }
   @media print {
@@ -238,13 +246,16 @@
     const paddingMm = 2;
     const maxQrByW = (w - paddingMm) * MM_TO_PX;
     const maxQrByH = (h - textHeightMm - paddingMm) * MM_TO_PX;
-    // qrPx：用户指定 mm 时直接换算；否则按显示项动态计算
-    let qrPx;
+    // qrMm：用户指定时直接用；否则按"占标签高度 85% 或 宽度 55% 取小者"作为默认
+    // 横向布局：文字在左，二维码在右；二维码宽高一致（正方形）
+    let qrMm;
     if (d.qrMm > 0) {
-      qrPx = Math.max(60, Math.min(400, Math.floor(d.qrMm * 3.7795)));
+      qrMm = d.qrMm;
     } else {
-      qrPx = Math.max(60, Math.min(400, Math.floor(Math.min(maxQrByW, maxQrByH))));
+      qrMm = Math.min(h * 0.85, w * 0.55);
     }
+    // qrPx：用于 SVG 渲染时的内部像素分辨率（max 400 保证清晰度）
+    let qrPx = Math.max(60, Math.min(400, Math.floor(qrMm * 3.7795)));
 
     const grid = document.getElementById("printGrid");
     grid.innerHTML = "";
@@ -260,17 +271,16 @@
       const qrContent = buildQrContent(d, code);
       let svg = "";
       try { svg = svgQrString(qrContent, qrPx) || ""; } catch (e) { svg = ""; }
-      // 用户指定二维码 mm 时，覆盖 SVG 默认撑满为固定 mm
-      if (d.qrMm > 0 && svg) {
-        svg = svg.replace('<svg ', '<svg style="width:' + d.qrMm + 'mm;height:' + d.qrMm + 'mm" ');
-      }
+      // SVG 在固定 mm 容器里居中显示（max-width/max-height 限制不超出）
       let html = '<div class="print-label" style="aspect-ratio:' + w + ' / ' + h + ';">';
+      html += '<div class="text-col">';
       if (sp) html += '<div class="p-product" style="font-size:calc(7pt * ' + fS + ')">' + escapeHtml(d.n) + '</div>';
       if (ss) html += '<div class="p-spec" style="font-size:calc(6.5pt * ' + fS + ')">' + escapeHtml(d.s || "") + '</div>';
-      html += '<div class="qr-img">' + svg + '</div>';
       if (sc) html += '<div class="p-code" style="font-size:calc(7.5pt * ' + fS + ')">' + escapeHtml(code) + '</div>';
       if (sb) html += '<div class="p-batch" style="font-size:calc(6pt * ' + fS + ')">批:' + escapeHtml(d.b) + ' | ' + escapeHtml(d.d || "") + '</div>';
       if (ct) html += '<div class="p-custom" style="font-size:calc(6pt * ' + fS + ');color:#555;width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(ct) + '</div>';
+      html += '</div>';
+      html += '<div class="qr-img" style="width:' + qrMm + 'mm;height:' + qrMm + 'mm;">' + svg + '</div>';
       html += '</div>';
       labels.push(html);
     }

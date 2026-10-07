@@ -237,21 +237,25 @@
     grid.style.setProperty("aspect-auto", "1");
 
     const labels = [];
+    // 显示开关 / 自定义文本 / 字体缩放（编辑器 editor.html 写入；老 URL 不带则默认全显）
+    const sp = d.sp !== false, ss = d.ss !== false, sc = d.sc !== false, sb = d.sb !== false;
+    const ct = d.ct || "";
+    const fS = d.fS || 1;
     for (let i = 0; i < count; i++) {
       const seq = start + i;
       const code = buildCode(prefix, d.b, seq);
       const qrContent = buildQrContent(d, code);
       let svg = "";
       try { svg = svgQrString(qrContent, qrPx) || ""; } catch (e) { svg = ""; }
-      labels.push(
-        '<div class="print-label" style="aspect-ratio:' + w + ' / ' + h + ';">' +
-          '<div class="p-product">' + escapeHtml(d.n) + '</div>' +
-          '<div class="p-spec">' + escapeHtml(d.s || "") + '</div>' +
-          '<div class="qr-img">' + svg + '</div>' +
-          '<div class="p-code">' + escapeHtml(code) + '</div>' +
-          '<div class="p-batch">批:' + escapeHtml(d.b) + ' | ' + escapeHtml(d.d || "") + '</div>' +
-        '</div>'
-      );
+      let html = '<div class="print-label" style="aspect-ratio:' + w + ' / ' + h + ';">';
+      if (sp) html += '<div class="p-product" style="font-size:calc(7pt * ' + fS + ')">' + escapeHtml(d.n) + '</div>';
+      if (ss) html += '<div class="p-spec" style="font-size:calc(6.5pt * ' + fS + ')">' + escapeHtml(d.s || "") + '</div>';
+      html += '<div class="qr-img">' + svg + '</div>';
+      if (sc) html += '<div class="p-code" style="font-size:calc(7.5pt * ' + fS + ')">' + escapeHtml(code) + '</div>';
+      if (sb) html += '<div class="p-batch" style="font-size:calc(6pt * ' + fS + ')">批:' + escapeHtml(d.b) + ' | ' + escapeHtml(d.d || "") + '</div>';
+      if (ct) html += '<div class="p-custom" style="font-size:calc(6pt * ' + fS + ');color:#555;width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(ct) + '</div>';
+      html += '</div>';
+      labels.push(html);
     }
     grid.innerHTML = labels.join("");
 
